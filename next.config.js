@@ -2,7 +2,7 @@
 const nextConfig = {
   reactStrictMode: true,
   serverRuntimeConfig: {
-    apiBearerToken: process.env.API_BEARER_TOKEN
+    API_BEARER_TOKEN: process.env.API_BEARER_TOKEN
   },
   publicRuntimeConfig: {}
 };

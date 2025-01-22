@@ -16,7 +16,7 @@ export default async function handler(
     const backendResponse = await fetch('http://localhost:8001/api/sales-assistant', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${serverRuntimeConfig.apiBearerToken}`,
+        'Authorization': `Bearer ${serverRuntimeConfig.API_BEARER_TOKEN}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(req.body)

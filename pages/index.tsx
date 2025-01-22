@@ -25,7 +25,12 @@ export default function Dashboard() {
         },
         async (payload) => {
         if (payload.new.session_id === sessionId) {
-          setMessages(prev => [...prev, payload.new.message.message]);
+          setMessages(prev => [...prev, {
+            ...payload.new.message.message,
+            type: 'ai',
+            id: uuidv4(),
+            timestamp: new Date().toISOString()
+          }]);
         }
       })
       .subscribe();
@@ -42,15 +47,17 @@ export default function Dashboard() {
     // Add human message
     // Add human message optimistically
     setMessages(prev => [...prev, {
+      id: uuidv4(),
       content: input,
-      type: 'human'
+      type: 'human',
+      timestamp: new Date().toISOString()
     }]);
     
     try {
       const response = await fetch('/api/sales-assistant', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${process.env.API_BEARER_TOKEN || 'dev_token'}`, // TEMP FALLBACK FOR DEVELOPMENT
+          // Authentication handled by server API route
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
