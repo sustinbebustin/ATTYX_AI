@@ -1,11 +1,13 @@
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 import json
+from contextlib import AbstractAsyncContextManager
 from supabase import create_client, Client
-from ..config.settings import SUPABASE_URL, SUPABASE_KEY
-from ..models.base import KnowledgeItem
+from config.settings import SUPABASE_URL, SUPABASE_KEY
+from models.base import KnowledgeItem
+from .interfaces.database import DatabaseServiceInterface
 
-class DatabaseService:
+class DatabaseService(DatabaseServiceInterface):
     def __init__(self):
         self.client: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
@@ -73,3 +75,41 @@ class DatabaseService:
             'timeframe': timeframe
         }).execute()
         return result.data
+
+    async def track_metric(self, metric_data: Dict[str, Any]) -> bool:
+        """Track a metric event in the metrics table"""
+        await self.client.table('metrics').insert(metric_data).execute()
+        return True
+
+    async def transaction(self):
+        """Context manager for database transactions"""
+        return self.client.transaction()
+
+    async def update_lead_status(self, lead_id: str, status_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Update lead status and return updated lead data"""
+        result = await self.client.table('leads').update(status_data).eq('id', lead_id).execute()
+        return result.data[0] if result.data else None
+
+    async def create_sale(self, sale_data: Dict[str, Any]) -> str:
+        """Create a new sale record"""
+        result = await self.client.table('sales').insert(sale_data).execute()
+        return result.data[0]['id']
+
+    async def log_loss_reason(
+        self,
+        lead_id: str,
+        reason: str,
+        details: Optional[str] = None,
+        stage: str = "",
+        time_in_pipeline: int = 0
+    ) -> bool:
+        """Log a loss reason for analysis"""
+        await self.client.table('loss_reasons').insert({
+            'lead_id': lead_id,
+            'reason': reason,
+            'details': details,
+            'stage': stage,
+            'time_in_pipeline': time_in_pipeline,
+            'timestamp': datetime.utcnow().isoformat()
+        }).execute()
+        return True

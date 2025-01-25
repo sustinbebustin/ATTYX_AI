@@ -1,10 +1,34 @@
 # ATTYX AI Platform
 
-[Previous content remains the same until Project Structure section...]
+ATTYX AI is an advanced artificial intelligence platform that revolutionizes the sales process through intelligent automation and real-time support. Built on PydanticAI, the platform combines sophisticated lead management, knowledge systems, and sales intelligence to optimize sales operations.
+
+## Key Features
+
+- **Intelligent Call Queue System**
+  - Smart lead prioritization and real-time notifications
+  - Dual-mode operation: Notification and "Ready" queue modes
+  - Automated email monitoring and response management
+
+- **Knowledge Management**
+  - Comprehensive product and business information database
+  - Vector-based semantic search capabilities
+  - Real-time Supabase synchronization
+
+- **Sales Intelligence**
+  - Context-aware sales strategies and recommendations
+  - Real-time performance analytics and lead scoring
+  - Automated document generation and workflow optimization
+
+## Technical Stack
+
+- **Core**: PydanticAI, FastAPI, Next.js 14, TypeScript
+- **Infrastructure**: Supabase, Redis, WebSocket
+- **AI/ML**: OpenAI API integration, Custom embedding pipeline
+- **DevOps**: Docker, GitHub Actions, pytest
 
 ## Project Structure
 
-````
+```
 ATTYX_AI/
 │
 ├── README.md                # Project overview and setup instructions
@@ -21,7 +45,7 @@ ATTYX_AI/
 │   │
 │   ├── agents/              # Directory for agent implementations
 │   │   ├── __init__.py
-│   │   ├── lead_management_agent.py     # Lead Notification and Processing Agents
+│   │   ├── lead_management_agent.py     # Lead lifecycle and status management
 │   │   ├── call_queue_agent.py           # Queue Management and Call Handling Agents
 │   │   ├── knowledge_management_agent.py  # Knowledge Retrieval and Verification Agents
 │   │   └── sales_intelligence_agent.py    # Sales Strategy and Analytics Agents
@@ -35,6 +59,10 @@ ATTYX_AI/
 │   │
 │   ├── services/            # Directory for service implementations
 │   │   ├── __init__.py
+│   │   ├── interfaces/      # Service interfaces for dependency injection
+│   │   │   ├── database.py    # Database service interface
+│   │   │   └── notification.py # Notification service interface
+│   │   ├── factory.py         # Service factory for dependency management
 │   │   ├── notification_service.py  # Handling notifications (Slack, Email)
 │   │   ├── database_service.py      # DB interactions and queries
 │   │   ├── api_service.py           # API interactions (e.g., OpenAI API)
@@ -55,7 +83,7 @@ ATTYX_AI/
 │   │
 │   └── tests/               # Directory for tests
 │       ├── __init__.py
-│       ├── test_agents.py         # Tests for agent behaviors
+│       ├── test_lead_management_agent.py  # Lead management tests
 │       ├── test_workflows.py      # Tests for workflow processes
 │       ├── test_services.py       # Tests for services
 │       └── test_models.py         # Tests for data models
@@ -69,16 +97,58 @@ ATTYX_AI/
 └── docker/                 # Docker-related files
     ├── Dockerfile          # Dockerfile for setting up the application container
     └── docker-compose.yml   # Docker Compose file for multi-container setup
+```
 
+## Architecture
+
+### Service Layer
+
+The platform uses a robust service layer with dependency injection for improved testability and maintainability:
+
+- **Service Interfaces**: Abstract interfaces define contracts for service implementations
+  - `DatabaseServiceInterface`: Database operations contract
+  - `NotificationServiceInterface`: Notification system contract
+
+- **Service Factory**: Centralized service management
+  - Singleton pattern for service instances
+  - Support for custom implementations
+  - Reset capability for testing
+
+- **Dependency Injection**: Services are injected into agents
+  - Improved testability through mock services
+  - Reduced coupling between components
+  - Better separation of concerns
+
+### Lead Management
+
+The lead management system provides comprehensive lead lifecycle handling:
+
+- **Status Management**:
+  - Validated status transitions
+  - Required field validation
+  - Business rule enforcement
+  - Comprehensive error handling
+
+- **Tracking & Notifications**:
+  - Automatic metric tracking
+  - Real-time notifications
+  - High-value lead monitoring
+  - Loss reason analysis
+
+- **Transaction Handling**:
+  - Atomic status updates
+  - Consistent state management
+  - Audit trail maintenance
 
 ## Development
 
 ### Setting Up Development Environment
 
 1. Install development dependencies:
+
 ```bash
-pip install -e \".[dev]\"
-````
+pip install -e ".[dev]"
+```
 
 2. Set up pre-commit hooks:
 
@@ -96,7 +166,7 @@ pytest
 pytest --cov=src
 
 # Run specific test file
-pytest tests/test_agents.py
+pytest tests/test_lead_management_agent.py
 ```
 
 ### Code Quality
@@ -166,5 +236,4 @@ For support and questions:
 
 - Built with [PydanticAI](https://github.com/pydantic/pydantic-ai)
 - Powered by [OpenAI](https://openai.com)
-- Database by [Supabase](https://supabase.com)`
-# ATTYX_AI
+- Database by [Supabase](https://supabase.com)
