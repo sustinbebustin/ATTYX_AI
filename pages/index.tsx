@@ -1,18 +1,92 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, Suspense } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { v4 as uuidv4 } from 'uuid';
 
+// Initialize Supabase client
 const supabase = createClient(
   'https://rdgnjccyntmolhdizbhj.supabase.co',
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJkZ25qY2N5bnRtb2xoZGl6YmhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzczNTI0MzYsImV4cCI6MjA1MjkyODQzNn0.ik_rOz8YxhsPnExPac-YxErjiTvGVnrWryDWkt_D7UQ'
 );
 
-export default function Dashboard() {
-  const [messages, setMessages] = useState<any[]>([]);
-  const [input, setInput] = useState('');
-  const [sessionId] = useState(uuidv4());
-  const [isChatOpen, setIsChatOpen] = useState(true);
+// Types
+interface Message {
+  id: string;
+  content: string;
+  type: 'human' | 'ai' | 'error' | 'system';
+  timestamp: string;
+  metadata?: {
+    action?: string;
+    data?: any;
+  };
+}
 
+interface ViewState {
+  tasks: any[];
+  pipeline: {
+    stages: string[];
+    deals: any[];
+  };
+  reporting: {
+    metrics: any[];
+    period: string;
+  };
+}
+
+// Error Boundary Component
+class ErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="rounded-lg bg-red-50 p-4 text-sm text-red-700">
+          <h2>Something went wrong</h2>
+          <button
+            onClick={() => this.setState({ hasError: false })}
+            className="mt-2 text-red-600 hover:text-red-800"
+          >
+            Try again
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+// Loading Component
+const LoadingSpinner = () => (
+  <div className="flex justify-center p-4">
+    <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600" />
+  </div>
+);
+
+// Main Component
+export default function Page() {
+  // State Management
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [input, setInput] = useState<string>('');
+  const [sessionId] = useState<string>(uuidv4());
+  const [isChatOpen, setIsChatOpen] = useState<boolean>(true);
+  const [currentView, setCurrentView] = useState<'tasks' | 'pipeline' | 'reporting'>('tasks');
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [viewState, setViewState] = useState<ViewState>({
+    tasks: [],
+    pipeline: { stages: [], deals: [] },
+    reporting: { metrics: [], period: 'month' }
+  });
+
+  // Real-time subscription setup
   useEffect(() => {
     const channel = supabase
       .channel('realtime-messages')
@@ -23,16 +97,23 @@ export default function Dashboard() {
           schema: 'public',
           table: 'messages'
         },
-        async (payload) => {
-        if (payload.new.session_id === sessionId) {
-          setMessages(prev => [...prev, {
-            ...payload.new.message.message,
-            type: 'ai',
-            id: uuidv4(),
-            timestamp: new Date().toISOString()
-          }]);
+        (payload) => {
+          if (payload.new.session_id === sessionId) {
+            const messageData = payload.new.message.message;
+            
+            if (messageData.type === 'system' && messageData.metadata?.action === 'updateView') {
+              handleViewUpdate(messageData.metadata.data);
+            } else {
+              setMessages(prev => [...prev, {
+                ...messageData,
+                type: messageData.type || 'ai',
+                id: uuidv4(),
+                timestamp: new Date().toISOString()
+              }]);
+            }
+          }
         }
-      })
+      )
       .subscribe();
 
     return () => {
@@ -40,145 +121,287 @@ export default function Dashboard() {
     };
   }, [sessionId]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim()) return;
+  // View state update handler
+  const handleViewUpdate = useCallback((data: any) => {
+    setViewState(prev => ({
+      ...prev,
+      [currentView]: { ...prev[currentView], ...data }
+    }));
+  }, [currentView]);
 
-    // Add human message
-    // Add human message optimistically
-    setMessages(prev => [...prev, {
+  // Message submission handler
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!input.trim() || isLoading) return;
+
+    setIsLoading(true);
+    const newMessage: Message = {
       id: uuidv4(),
       content: input,
       type: 'human',
       timestamp: new Date().toISOString()
-    }]);
-    
+    };
+
+    setMessages(prev => [...prev, newMessage]);
+
     try {
       const response = await fetch('/api/sales-assistant', {
         method: 'POST',
         headers: {
-          // Authentication handled by server API route
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           query: input,
           user_id: "NA",
           request_id: uuidv4(),
-          session_id: sessionId
+          session_id: sessionId,
+          current_view: currentView,
+          view_state: viewState[currentView]
         })
       });
 
       if (!response.ok) {
-        const errorBody = await response.json();
-        throw new Error(errorBody.error || 'API request failed');
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
+
+      const data = await response.json();
       
+      if (data.type === 'command' && data.action === 'setView') {
+        setCurrentView(data.view);
+      }
     } catch (error) {
-      console.error('Error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       setMessages(prev => [...prev, {
         id: uuidv4(),
-        content: 'Error processing request',
+        content: `Error: ${errorMessage}`,
         type: 'error',
         timestamp: new Date().toISOString()
       }]);
+    } finally {
+      setIsLoading(false);
+      setInput('');
     }
-    
-    setInput('');
-  };
+  }, [input, sessionId, currentView, viewState, isLoading]);
 
-  return (
-    <div className="flex h-screen bg-[#000000]">
-      {/* Main Dashboard Area */}
-      <div className={`relative transition-all duration-300 ${isChatOpen ? 'w-[85%]' : 'w-full'}`}>
-        <div className="absolute inset-0 flex flex-col">
-          <div className="h-16 border-b border-white/10 bg-gradient-to-b from-black/80 to-black/20 backdrop-blur-md">
-            <div className="flex h-full items-center px-6">
-              <h1 className="text-lg font-semibold text-gray-300">ATTYX Sales Dashboard</h1>
+  // View Components
+  const TaskView = () => (
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-semibold text-gray-900">Tasks</h2>
+        <button className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm text-gray-700 shadow-sm hover:bg-gray-50">
+          New Task
+        </button>
+      </div>
+      <div className="grid gap-4">
+        {viewState.tasks.map((task, i) => (
+          <div key={i} className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+            <h3 className="font-medium text-gray-900">{task.title}</h3>
+            <p className="text-sm text-gray-500 mt-1">{task.description}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  const PipelineView = () => (
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-semibold text-gray-900">Pipeline</h2>
+        <button className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm text-gray-700 shadow-sm hover:bg-gray-50">
+          Add Deal
+        </button>
+      </div>
+      <div className="grid grid-cols-4 gap-4">
+        {viewState.pipeline.stages.map((stage, i) => (
+          <div key={i} className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+            <h3 className="font-medium text-gray-900">{stage}</h3>
+            <div className="mt-2 space-y-2">
+              {viewState.pipeline.deals
+                .filter(deal => deal.stage === stage)
+                .map((deal, j) => (
+                  <div key={j} className="rounded-lg bg-gray-50 p-2">
+                    <p className="font-medium text-gray-900">{deal.name}</p>
+                    <p className="text-sm text-gray-500">${deal.value}</p>
+                  </div>
+                ))}
             </div>
           </div>
-          <div className="flex-1 bg-gradient-to-br from-gray-900/95 to-black p-6">
-            <div className="h-full rounded-xl border border-white/10 bg-gradient-to-br from-gray-900/50 to-gray-900/20 backdrop-blur-xl">
-              {/* Dashboard content will go here */}
-            </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  const ReportingView = () => (
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-semibold text-gray-900">Analytics</h2>
+        <select
+          value={viewState.reporting.period}
+          onChange={(e) => handleViewUpdate({ period: e.target.value })}
+          className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm text-gray-700 shadow-sm"
+        >
+          <option value="week">This Week</option>
+          <option value="month">This Month</option>
+          <option value="quarter">This Quarter</option>
+          <option value="year">This Year</option>
+        </select>
+      </div>
+      <div className="grid grid-cols-3 gap-4">
+        {viewState.reporting.metrics.map((metric, i) => (
+          <div key={i} className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+            <h3 className="font-medium text-gray-900">{metric.name}</h3>
+            <p className="text-2xl font-bold text-gray-900 mt-2">{metric.value}</p>
+            <p className="text-sm text-gray-500 mt-1">{metric.change}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="flex min-h-screen bg-gray-50">
+      {/* Main content area */}
+      <div className={`flex-1 flex items-center justify-center ${isChatOpen ? 'w-[calc(100%-440px)]' : 'w-full'} animate-fade-in`}>
+        <div className="max-w-5xl w-full items-center justify-between px-8">
+          <h1 className="text-6xl font-bold tracking-tight text-gray-900 animate-slide-up">
+            Welcome to{' '}
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary-600 to-primary-400">
+              Attyx AI
+            </span>
+          </h1>
+          <p className="mt-6 text-xl text-gray-600 max-w-2xl animate-slide-up" style={{ animationDelay: '200ms' }}>
+            Your intelligent CRM assistant powered by advanced AI. Manage deals, analyze customer relationships, and get actionable insights.
+          </p>
+          
+          {/* Dashboard Views */}
+          <div className="mt-16 space-y-8 w-full">
+            <ErrorBoundary>
+              <Suspense fallback={<LoadingSpinner />}>
+                {currentView === 'tasks' && (
+                  <div className="rounded-2xl bg-white p-8 shadow-sm border border-gray-200">
+                    <TaskView />
+                  </div>
+                )}
+
+                {currentView === 'pipeline' && (
+                  <div className="rounded-2xl bg-white p-8 shadow-sm border border-gray-200">
+                    <PipelineView />
+                  </div>
+                )}
+
+                {currentView === 'reporting' && (
+                  <div className="rounded-2xl bg-white p-8 shadow-sm border border-gray-200">
+                    <ReportingView />
+                  </div>
+                )}
+              </Suspense>
+            </ErrorBoundary>
           </div>
         </div>
       </div>
 
-      {/* Chat Interface */}
+      {/* Chat Interface - 440px fixed width */}
       {isChatOpen && (
-        <div className="w-[15%] border-l border-white/10 bg-gradient-to-b from-black/80 via-black/60 to-black/80 backdrop-blur-xl">
-          <div className="flex h-full flex-col">
-            <div className="flex-1 overflow-y-auto px-4 pt-6">
-              <div className="space-y-4">
-                {messages.map((message) => (
-                  <div
-                    key={message.id}
-                    className={`flex ${message.type === 'human' ? 'justify-end' : 'justify-start'}`}
-                  >
-                    <div
-                      className={`relative max-w-[85%] rounded-2xl p-4 ${
-                        message.type === 'human'
-                          ? 'bg-blue-500/90 text-white'
-                          : 'bg-gray-700/60 text-gray-100'
-                      }`}
-                      style={{
-                        boxShadow: '0 4px 12px -2px rgba(0, 0, 0, 0.2)'
-                      }}
-                    >
-                      <div className="absolute -bottom-1 h-3 w-3 transform rotate-45 bg-inherit"
-                        style={{
-                          [message.type === 'human' ? 'right' : 'left']: '12px'
-                        }}
-                      />
-                      <p className="text-[15px] leading-snug">{message.content}</p>
-                      <div className="mt-1.5 flex items-center justify-end space-x-1.5">
-                        <span className="text-xs opacity-60">
-                          {new Date(message.timestamp).toLocaleTimeString([], {
-                            hour: 'numeric',
-                            minute: '2-digit'
-                          })}
-                        </span>
-                        {message.type === 'human' && (
-                          <svg className="h-3 w-3 text-white/60" fill="currentColor" viewBox="0 0 12 12">
-                            <path d="M10.28 2.28L3.989 8.575 1.695 6.28A1 1 0 00.28 7.695l3 3a1 1 0 001.414 0l7-7A1 1 0 0010.28 2.28z" />
-                          </svg>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+        <div className="relative w-[440px] flex flex-col bg-white border-l border-gray-200">
+          {/* Header */}
+          <div className="p-4 border-b border-gray-200">
+            <h2 className="text-lg font-semibold text-gray-900">
+              Attyx AI Assistant
+            </h2>
+            <p className="text-sm text-gray-500 mt-1">
+              Your intelligent CRM companion
+            </p>
+          </div>
 
-            <form onSubmit={handleSubmit} className="border-t border-white/10 p-4">
-              <div className="relative rounded-xl bg-gray-800/50 backdrop-blur-sm">
-                <input
-                  type="text"
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  className="w-full bg-transparent py-3 pl-4 pr-12 text-sm text-gray-100 placeholder-gray-400 focus:outline-none"
-                  placeholder="Message ATTYX AI..."
-                />
-                <button
-                  type="submit"
-                  className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1.5 hover:bg-gray-700/50 transition-colors"
-                  disabled={!input.trim()}
-                >
-                  <svg className="h-5 w-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                  </svg>
-                </button>
+          {/* Messages Area */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {messages.length === 0 ? (
+              <div className="space-y-4">
+                <div className="rounded-lg border border-gray-200 bg-white px-4 py-3 text-left text-sm text-gray-700 shadow-sm">
+                  <h3 className="font-medium mb-2">Example Questions</h3>
+                  <button 
+                    className="block w-full text-left hover:bg-gray-50 rounded p-2 transition-colors"
+                    onClick={() => setInput("Show Q3 pipeline")}
+                  >
+                    "Show Q3 pipeline"
+                  </button>
+                  <button 
+                    className="block w-full text-left hover:bg-gray-50 rounded p-2 transition-colors"
+                    onClick={() => setInput("Create follow-up task")}
+                  >
+                    "Create follow-up task"
+                  </button>
+                  <button 
+                    className="block w-full text-left hover:bg-gray-50 rounded p-2 transition-colors"
+                    onClick={() => setInput("Analyze lead conversion")}
+                  >
+                    "Analyze lead conversion"
+                  </button>
+                </div>
               </div>
+            ) : (
+              messages.map((message) => (
+                <div
+                  key={message.id}
+                  className={`rounded-2xl p-4 ${
+                    message.type === 'human'
+                      ? 'bg-blue-600 text-white ml-12'
+                      : message.type === 'error'
+                      ? 'bg-red-50 text-red-700'
+                      : 'bg-gray-100 text-gray-900 mr-12'
+                  }`}
+                >
+                  {message.content}
+                </div>
+              ))
+            )}
+            {isLoading && <LoadingSpinner />}
+          </div>
+
+          {/* Input Section */}
+          <div className="border-t border-gray-200 p-4 bg-white">
+            <form onSubmit={handleSubmit} className="flex items-center gap-2">
+              <textarea
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder="Type your message..."
+                className="flex-1 min-h-[44px] max-h-32 px-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                disabled={isLoading}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    if (input.trim()) handleSubmit(e as any);
+                  }
+                }}
+              />
+              <button
+                type="submit"
+                disabled={!input.trim() || isLoading}
+                className="rounded-full p-2 bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:hover:bg-blue-600"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                </svg>
+              </button>
             </form>
           </div>
         </div>
       )}
-      
+
+      {/* Toggle Chat Button */}
       <button
         onClick={() => setIsChatOpen(!isChatOpen)}
-        className="absolute right-4 top-4 rounded-lg bg-slate-800 p-2 hover:bg-slate-700"
+        className="fixed right-4 top-4 rounded-full p-2 bg-white border border-gray-200 shadow-sm hover:bg-gray-50"
       >
-        {isChatOpen ? '→' : '←'}
+        {isChatOpen ? (
+          <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        ) : (
+          <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+          </svg>
+        )}
       </button>
     </div>
   );
