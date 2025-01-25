@@ -2,6 +2,32 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  @font-face {
+    font-family: "SF Pro";
+    font-weight: 400;
+    src: url("/fonts/SF-Pro-Regular.woff2") format("woff2"),
+         url("/fonts/SF-Pro-Regular.woff") format("woff");
+  }
+  @font-face {
+    font-family: "SF Pro";
+    font-weight: 700;
+    src: url("/fonts/SF-Pro-Bold.woff2") format("woff2"),
+         url("/fonts/SF-Pro-Bold.woff") format("woff");
+  }
+}
+
+@keyframes bubble-float {
+  0% { transform: translateY(4px) scale(0.98); opacity: 0.8; }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+@keyframes status-morph {
+  0% { border-radius: 24px; width: 120px; }
+  50% { border-radius: 16px; width: 160px; }
+  100% { border-radius: 24px; width: 120px; }
+}
+
 /* Custom resize handle styles */
 .resize-tab {
   @apply absolute left-[-12px] top-1/2 -translate-y-1/2;
