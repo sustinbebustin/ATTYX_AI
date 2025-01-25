@@ -78,6 +78,38 @@ export default function Page() {
   const [input, setInput] = useState<string>('');
   const [sessionId] = useState<string>(uuidv4());
   const [isChatOpen, setIsChatOpen] = useState<boolean>(true);
+  const [chatWidth, setChatWidth] = useState<number>(440);
+  const [isResizing, setIsResizing] = useState<boolean>(false);
+
+  // Handle mouse move during resize
+  const handleMouseMove = useCallback((e: MouseEvent) => {
+    if (!isResizing) return;
+    
+    const windowWidth = window.innerWidth;
+    const minWidth = windowWidth * 0.15; // 15% of screen width
+    const maxWidth = windowWidth * 0.50; // 50% of screen width
+    const newWidth = windowWidth - e.clientX;
+    
+    // Constrain width between 25% and 50% of screen width
+    setChatWidth(Math.min(Math.max(newWidth, minWidth), maxWidth));
+  }, [isResizing]);
+
+  // Handle mouse up to stop resizing
+  const handleMouseUp = useCallback(() => {
+    setIsResizing(false);
+  }, []);
+
+  // Add and remove event listeners for resize
+  useEffect(() => {
+    if (isResizing) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+    }
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isResizing, handleMouseMove, handleMouseUp]);
   const [currentView, setCurrentView] = useState<'tasks' | 'pipeline' | 'reporting'>('tasks');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [viewState, setViewState] = useState<ViewState>({
@@ -261,7 +293,9 @@ export default function Page() {
   return (
     <div className="flex min-h-screen bg-gray-50">
       {/* Main content area */}
-      <div className={`flex-1 flex items-center justify-center ${isChatOpen ? 'w-[calc(100%-440px)]' : 'w-full'} animate-fade-in`}>
+      <div className={`flex-1 flex items-center justify-center ${
+        isChatOpen ? `w-[calc(100%-${chatWidth}px)]` : 'w-full'
+      } animate-fade-in transition-all duration-200`}>
         <div className="max-w-5xl w-full items-center justify-between px-8">
           <h1 className="text-6xl font-bold tracking-tight text-gray-900 animate-slide-up">
             Welcome to{' '}
@@ -269,7 +303,7 @@ export default function Page() {
               Attyx AI
             </span>
           </h1>
-          <p className="mt-6 text-xl text-gray-600 max-w-2xl animate-slide-up" style={{ animationDelay: '200ms' }}>
+          <p className="mt-6 text-xl text-gray-600 animate-slide-up" style={{ animationDelay: '200ms' }}>
             Your intelligent CRM assistant powered by advanced AI. Manage deals, analyze customer relationships, and get actionable insights.
           </p>
           
@@ -302,7 +336,15 @@ export default function Page() {
 
       {/* Chat Interface - 440px fixed width */}
       {isChatOpen && (
-        <div className="relative w-[440px] flex flex-col bg-white border-l border-gray-200">
+        <div
+          className={`relative flex flex-col bg-white border-l border-gray-200`}
+          style={{ width: `${chatWidth}px` }}
+        >
+          {/* Resize Handle */}
+          <div
+            className="absolute left-0 top-0 w-1 h-full cursor-ew-resize hover:bg-blue-500/50 transition-colors"
+            onMouseDown={() => setIsResizing(true)}
+          />
           {/* Header */}
           <div className="p-4 border-b border-gray-200">
             <h2 className="text-lg font-semibold text-gray-900">
@@ -319,20 +361,20 @@ export default function Page() {
               <div className="space-y-4">
                 <div className="rounded-lg border border-gray-200 bg-white px-4 py-3 text-left text-sm text-gray-700 shadow-sm">
                   <h3 className="font-medium mb-2">Example Questions</h3>
-                  <button 
-                    className="block w-full text-left hover:bg-gray-50 rounded p-2 transition-colors"
+                  <button
+                    className="block w-full rounded-lg bg-white border border-gray-200 p-2 text-left text-sm text-gray-700 hover:border-gray-300 hover:bg-gray-50 hover:shadow-md transition-all"
                     onClick={() => setInput("Show Q3 pipeline")}
                   >
                     "Show Q3 pipeline"
                   </button>
-                  <button 
-                    className="block w-full text-left hover:bg-gray-50 rounded p-2 transition-colors"
+                  <button
+                    className="block w-full rounded-lg bg-white border border-gray-200 p-2 text-left text-sm text-gray-700 hover:border-gray-300 hover:bg-gray-50 hover:shadow-md transition-all"
                     onClick={() => setInput("Create follow-up task")}
                   >
                     "Create follow-up task"
                   </button>
-                  <button 
-                    className="block w-full text-left hover:bg-gray-50 rounded p-2 transition-colors"
+                  <button
+                    className="block w-full rounded-lg bg-white border border-gray-200 p-2 text-left text-sm text-gray-700 hover:border-gray-300 hover:bg-gray-50 hover:shadow-md transition-all"
                     onClick={() => setInput("Analyze lead conversion")}
                   >
                     "Analyze lead conversion"
@@ -377,7 +419,11 @@ export default function Page() {
               <button
                 type="submit"
                 disabled={!input.trim() || isLoading}
-                className="rounded-full p-2 bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:hover:bg-blue-600"
+                className={`rounded-full p-2 text-white ${
+                  input.trim() && !isLoading
+                    ? 'bg-blue-600 hover:bg-blue-700'
+                    : 'bg-gray-300 cursor-not-allowed'
+                }`}
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />

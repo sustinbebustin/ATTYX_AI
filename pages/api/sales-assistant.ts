@@ -29,7 +29,21 @@ export default async function handler(
       throw new Error(`Backend request failed: ${responseText}`);
     }
 
-    res.status(200).json(JSON.parse(responseText));
+    const responseData = JSON.parse(responseText);
+    
+    // Detect view change requests in user query
+    const userQuery = req.body.query.toLowerCase();
+    let viewCommand = null;
+    
+    if (userQuery.includes('pipeline')) {
+      viewCommand = { type: 'command', action: 'setView', view: 'pipeline' };
+    } else if (userQuery.includes('task') || userQuery.includes('todo')) {
+      viewCommand = { type: 'command', action: 'setView', view: 'tasks' };
+    } else if (userQuery.includes('report') || userQuery.includes('analytics')) {
+      viewCommand = { type: 'command', action: 'setView', view: 'reporting' };
+    }
+
+    res.status(200).json(viewCommand || responseData);
   } catch (error: any) {
     res.status(500).json({ error: error.message || 'Internal server error' });
   }
