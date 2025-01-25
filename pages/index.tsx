@@ -162,10 +162,13 @@ export default function Dashboard() {
 
       {/* Chat Interface */}
       {isChatOpen && (
-        <div
-          className={`relative flex flex-col bg-white border-l border-gray-200 ${isResizing ? 'resizing' : ''}`}
-          style={{ width: `${chatWidth}px` }}
-        >
+<div
+  className={`relative flex flex-col bg-white border-l border-gray-200 ${isResizing ? 'resizing' : ''}`}
+  style={{ width: `${chatWidth}px` }}
+>
+  <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+    <h2 className="text-lg font-semibold text-gray-900">Attyx AI Assistant</h2>
+  </div>
           {/* Tab-style Resize Handle */}
           <div
             className={`resize-tab ${isResizing ? 'active' : ''}`}
