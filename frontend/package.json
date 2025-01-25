@@ -1,0 +1,29 @@
+{
+  "name": "attyx-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --turbo",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.48.0",
+    "@types/uuid": "^10.0.0",
+    "next": "^14.2.23",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "tailwindcss-animate": "^1.0.7",
+    "uuid": "^11.0.5"
+  },
+  "devDependencies": {
+    "@types/next": "^8.0.7",
+    "@types/node": "^20.11.28",
+    "@types/react": "^18.2.66",
+    "@types/react-dom": "^18",
+    "postcss": "^8",
+    "tailwindcss": "^3.4.1",
+    "typescript": "^5.3.3"
+  }
+}

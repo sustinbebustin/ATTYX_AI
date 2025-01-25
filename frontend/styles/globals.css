@@ -1,0 +1,107 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Apple-style semantic color system */
+  --background: #ffffff;
+  --foreground: #1d1d1f;
+  --primary: #0071e3;
+  --primary-hover: #0077ed;
+  --secondary: #86868b;
+  --tertiary: #f5f5f7;
+  --surface: #fbfbfd;
+  --surface-elevated: rgba(251, 251, 253, 0.8);
+  --border: #d2d2d7;
+  
+  /* Typography */
+  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  
+  /* Effects */
+  --backdrop-blur: blur(20px);
+  --glass-effect: linear-gradient(
+    to bottom right,
+    rgba(255, 255, 255, 0.5),
+    rgba(255, 255, 255, 0.3)
+  );
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #000000;
+    --foreground: #f5f5f7;
+    --primary: #0a84ff;
+    --primary-hover: #1a8cff;
+    --secondary: #86868b;
+    --tertiary: #1d1d1f;
+    --surface: #1c1c1e;
+    --surface-elevated: rgba(28, 28, 30, 0.8);
+    --border: #2c2c2e;
+    
+    --glass-effect: linear-gradient(
+      to bottom right,
+      rgba(28, 28, 30, 0.8),
+      rgba(28, 28, 30, 0.6)
+    );
+  }
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Enhanced glass effects */
+.glass-pane {
+  background: var(--glass-effect);
+  border: 1px solid var(--border);
+  backdrop-filter: var(--backdrop-blur);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.05);
+}
+
+/* Gradient text effect */
+.text-gradient {
+  background-image: linear-gradient(45deg, var(--primary), var(--secondary));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Message styling */
+.message-user {
+  background: var(--surface-elevated);
+  border: 1px solid var(--border);
+  border-radius: 8px 8px 0 8px;
+}
+
+.message-ai {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px 8px 8px 0;
+}
+
+/* Loading spinner */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.loading-spinner {
+  width: 1.5rem;
+  height: 1.5rem;
+  border: 2px solid var(--border);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+/* Smooth transitions */
+@media (prefers-reduced-motion: no-preference) {
+  .animate-smooth {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+}

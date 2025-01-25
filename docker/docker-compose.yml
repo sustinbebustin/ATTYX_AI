@@ -1,0 +1,73 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      - ../frontend:/app
+      - /app/node_modules
+      - /app/.next
+    env_file:
+      - ../.env
+    networks:
+      - attyx_network
+
+  web:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+      - ./logs:/app/logs
+    env_file:
+      - .env
+    depends_on:
+      - redis
+    networks:
+      - attyx_network
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - attyx_network
+
+  celery_worker:
+    build: .
+    command: celery -A src.main.celery worker --loglevel=info
+    volumes:
+      - .:/app
+      - ./logs:/app/logs
+    env_file:
+      - .env
+    depends_on:
+      - redis
+    networks:
+      - attyx_network
+
+  celery_beat:
+    build: .
+    command: celery -A src.main.celery beat --loglevel=info
+    volumes:
+      - .:/app
+      - ./logs:/app/logs
+    env_file:
+      - .env
+    depends_on:
+      - redis
+    networks:
+      - attyx_network
+
+volumes:
+  redis_data:
+
+networks:
+  attyx_network:
+    driver: bridge
